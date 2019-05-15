@@ -1,0 +1,23 @@
+every thing about blocktracking is in this folder, they are:
+	func.lua	the main function of blocktracking
+	calcPos.lua contains the functions of calculating the location of apriltags, boxes, structures
+	tracking.lua if for tracking tags, boxes, structure in a serious of frames
+
+	in folder math and solveSqu are tool functions, like Vector3, Matrix  etc.
+
+-------------------------------------------------------------------------
+
+the basic logic in func is:
+	it holds a mind of all the tags and boxes
+
+	for each frame, it takes all the 2D information of tags seen in current frame
+	1. locating: calculate 3D position and rotation for each tag
+	2. tracking: match each seen tag with the tags in mind(hungarian algorithm is used here), upgrade the tags in mind
+	3. locating boxes: use this upgraded tags in mind to calculate the boxes position
+	4. tracking boxes: match and upgrade boxes in mind
+	5. structures: cluster boxes into structures
+
+-------------------------------------------------------------------------
+syntax
+	everyting in this folder is written in lua
+	with tabs as indent
