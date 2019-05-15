@@ -66,7 +66,7 @@ int WindowHeightMiddle, WindowwidthMiddle;	// the size of window
 int WindowX, WindowY;	// the size of window
 
 	/*----------------- Navigations -------------------------*/
-float EyeWInit = 275, 	EyeThInit = 30, 	EyeLInit = 2.5;
+float EyeWInit = 270, 	EyeThInit = -90, 	EyeLInit = 0.001;
 float EyeXInit = 0, 	EyeYInit = 0, 		EyeZInit = 0;
 float EyeW = EyeWInit,	EyeTh = EyeThInit,	EyeL = EyeLInit;				// all unit mm and degree
 float EyeX = EyeXInit,	EyeY = EyeYInit,	EyeZ = EyeZInit;					// all unit mm
@@ -124,7 +124,7 @@ int main(int argc, char* argv[])
 	SystemwidthMiddle = Windowwidth / 2;
 	SystemHeightMiddle = WindowHeight / 2;
 
-	WindowX = 0, WindowY = 0;	// the position of window
+	WindowX = Systemwidth / 2, WindowY = SystemHeight / 2;	// the position of window
 	glutInitWindowPosition(WindowX, WindowY);     
 	glutInitWindowSize(Windowwidth, WindowHeight);      
 	glutCreateWindow("Simulator");     
@@ -171,7 +171,7 @@ void myDisplay(void)
 	glEnable(GL_DEPTH_TEST);
 
 	//--- Light and Material ---//
-	const GLfloat light_position[] = { -100.0, -20.0, -100.0, 0.0 };
+	const GLfloat light_position[] = { -0.0, -0.0, -100.0, 0.0 };
 	const GLfloat light_ambient [] = { 0.1, 0.1, 0.1, 1.0 };
 	const GLfloat light_diffuse [] = { 0.1, 0.1, 0.1, 1.0 };
 	const GLfloat light_specular[] = { 0.1, 0.1, 0.1, 1.0 };

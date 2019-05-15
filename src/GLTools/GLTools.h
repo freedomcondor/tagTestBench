@@ -21,6 +21,7 @@
 #include <opencv2/opencv.hpp>
 #include <apriltag/apriltag.h>
 #include <apriltag/tag36h11.h>
+#include <apriltag/apriltag_pose.h>
 
 /*------------ Function Control Channels ------------*/
 extern double CH1,CH1_MAX,CH1_MIN,CH1_STEP;

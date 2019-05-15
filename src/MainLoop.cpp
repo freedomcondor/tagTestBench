@@ -34,6 +34,7 @@ VideoCapture video1;
 // apriltag
 apriltag_detector* TagDetector;
 apriltag_family* TagFamily;
+apriltag_detection_info_t CameraInfo;
 
 #define NTAGS 10
 int nTags = 0;
@@ -43,6 +44,7 @@ Box tags[NTAGS];
 int drawCross(Mat img, int x, int y, const char colour[],int label);
 int drawCross(Mat img, int x, int y, const char colour[]);
 int setColor(cv::Vec<unsigned char, 3> &pix,int R,int G, int B);
+int rotationMatToQuaternion(double data[], Quaternion& q);
 
 /* --------------- MainLoop functions --------------------*/
 int function_exit()
@@ -78,6 +80,13 @@ int function_init(int SystemWidth, int SystemHeight)
 	TagFamily = tag36h11_create();
 	apriltag_detector_add_family(TagDetector, TagFamily);
 
+	// apriltag pose estimation
+	CameraInfo.tagsize = 0.0235;
+	CameraInfo.fx = 939.001439;
+	CameraInfo.fy = 939.001439;
+	CameraInfo.cx = 320 ;
+	CameraInfo.cy = 240;
+
 	return 0;
 }
 
@@ -100,16 +109,29 @@ int function_step(double time)	// time in s
 	nTags = zarray_size(psDetections);
 	for (int i = 0; i < nTags; i++)
 	{
-		int L = 640;
-		apriltag_detection_t *psDetection;
-		zarray_get(psDetections, i, &psDetection);
+		// get detection
+		apriltag_detection_t *detection;
+		zarray_get(psDetections, i, &detection);
+
+		// draw on opencv screen
 		// for apriltag width first, height second 
 		// for opencv height first, width second 
-		drawCross(imgRGB, psDetection->c[1], psDetection->c[0], "blue");
-		drawCross(imgRGB, psDetection->p[0][1], psDetection->p[0][0], "blue");
-		drawCross(imgRGB, psDetection->p[1][1], psDetection->p[1][0], "blue");
-		drawCross(imgRGB, psDetection->p[2][1], psDetection->p[2][0], "blue");
-		drawCross(imgRGB, psDetection->p[3][1], psDetection->p[3][0], "blue");
+		drawCross(imgRGB, detection->c[1], detection->c[0], "blue");
+		drawCross(imgRGB, detection->p[0][1], detection->p[0][0], "blue");
+		drawCross(imgRGB, detection->p[1][1], detection->p[1][0], "blue");
+		drawCross(imgRGB, detection->p[2][1], detection->p[2][0], "blue");
+		drawCross(imgRGB, detection->p[3][1], detection->p[3][0], "blue");
+
+		// pose detection
+		apriltag_pose_t pose;
+		CameraInfo.det = detection; // don't know what does it mean
+		//double err = estimate_tag_pose(&CameraInfo, &pose);	
+		estimate_pose_for_tag_homography(&CameraInfo, &pose);	
+
+		tags[i].setl(pose.t->data[0], pose.t->data[1], pose.t->data[2]);
+		Quaternion q;
+		rotationMatToQuaternion(pose.R->data, q);
+		tags[i].setq(q);
 	}
 
 	// destroy and draw 
@@ -241,3 +263,14 @@ int setColor(cv::Vec<unsigned char, 3> &pix,int R,int G, int B)
 	return 0;
 }
 
+int rotationMatToQuaternion(double data[], Quaternion& q)
+{
+	double w, x, y, z;
+	w = sqrt(1.0 + data[3*0+0] + data[3*1+1] + data[3*2+2]) / 2.0;
+	double w4 = w * 4.0;
+	x = (data[3*2+1] - data[3*1+2]) / w4;
+	y = (data[3*0+2] - data[3*2+0]) / w4;
+	z = (data[3*1+0] - data[3*0+1]) / w4;
+	q.setHardValue(x,y,z,w);
+	return 0;
+}
