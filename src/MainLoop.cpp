@@ -20,7 +20,6 @@
 #include "Cylinder.h"
 #include "Convexhull.h"
 
-
 #include <lua5.2/lua.h>
 #include <lua5.2/lauxlib.h>
 #include <lua5.2/lualib.h>
@@ -46,6 +45,7 @@ lua_State *L;
 #define NTAGS 10
 int nTags = 0;
 Box tags[NTAGS];
+Box homotags[NTAGS];
 Box luatags[NTAGS];
 
 // functions
@@ -72,6 +72,8 @@ int function_init(int SystemWidth, int SystemHeight)
 		tags[i].setSize(0.03, 0.03, 0.001);
 	for (int i = 0; i < NTAGS; i++)
 		luatags[i].setSize(0.03, 0.03, 0.001);
+	for (int i = 0; i < NTAGS; i++)
+		homotags[i].setSize(0.03, 0.03, 0.001);
 
 	// open camera
 	video1.open(0);
@@ -142,12 +144,15 @@ int function_step(double time)	// time in s
 		CameraInfo.det = detection; // don't know what does it mean
 
 		double err = estimate_tag_pose(&CameraInfo, &pose);	
-		//estimate_pose_for_tag_homography(&CameraInfo, &pose);	
-
 		tags[i].setl(pose.t->data[0], pose.t->data[1], pose.t->data[2]);
 		Quaternion q;
 		rotationMatToQuaternion(pose.R->data, q);
 		tags[i].setq(q);
+
+		estimate_pose_for_tag_homography(&CameraInfo, &pose);	
+		homotags[i].setl(pose.t->data[0], pose.t->data[1], pose.t->data[2]);
+		rotationMatToQuaternion(pose.R->data, q);
+		homotags[i].setq(q);
 	}
 
 	// lua blocktracking
@@ -169,6 +174,9 @@ int function_draw()
 	{
 		luatags[i].l += Vector3(0.2, 0, 0);
 		luatags[i].draw();
+
+		homotags[i].l -= Vector3(0.2,0,0);
+		homotags[i].draw();
 	}
 	return 0;
 }
