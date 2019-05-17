@@ -55,3 +55,32 @@ void solveQuad(double a1, double b1, double c1,
 	          threshold,x,y,
 	          count + 1, pansx, pansy);
 }
+
+void solveSquare(double points[], double camera[])
+{
+	double ku, kv, u0, v0;
+	ku = camera[0];
+	kv = camera[1];
+	u0 = camera[2];
+	v0 = camera[3];
+
+	double u1, v1, u2, v2, u3, v3, u4, v4;
+	u1 = points[0];
+	v1 = points[1];
+	u2 = points[2];
+	v2 = points[3];
+	u3 = points[4];
+	v3 = points[5];
+	u4 = points[6];
+	v4 = points[7];
+
+	// solve linar equation
+	double c0 = -(u1*v2 - u2*v1 - u1*v3 + u3*v1 + u2*v4 - u4*v2 - u3*v4 + u4*v3)/
+		    (u1*v2 - u2*v1 - u1*v4 + u2*v3 - u3*v2 + u4*v1 + u3*v4 - u4*v3)
+	double r0 = -(	u1*v3 - u3*v1 - u1*v4 - u2*v3 + u3*v2 + u4*v1 + u2*v4 - u4*v2)/
+		    (	u1*v2 - u2*v1 - u1*v4 + u2*v3 - u3*v2 + u4*v1 + u3*v4 - u4*v3)
+		// got a c/z and r/z proximately, for quadric solving later as a starting point
+	
+
+}
+
