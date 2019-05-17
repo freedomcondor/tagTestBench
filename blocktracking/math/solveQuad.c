@@ -13,23 +13,22 @@ void solveQuad(double a1, double b1, double c1,
 	//   if count > XXXX (specified in line 50), considered no solution
 	double x = x0;
 	double y = y0;
+
 	double F1 = a1*x*x + b1*y*y + c1*x*y + d1*x + e1*y + f1;
 	double F2 = a2*x*x + b2*y*y + c2*x*y + d2*x + e2*y + f2;
-	printf("loop %d %lf, %lf\n", count,F1,F2);
 	if ((F1 >= -threshold) && (F1 <= threshold) &&
 	    (F2 >= -threshold) && (F2 <= threshold)    )
 	{
 		*pansx = x; *pansy = y; return;
 	}
 
-	double F1_x = 2*a1*x+c1*y+d1;
-	double F1_y = 2*b1*y+c1*x+e1;
-
-	double F2_x = 2*a2*x+c2*y+d2;
-	double F2_y = 2*b2*y+c2*x+e2;
-
+	// partical derivative
 	// climb up direction of F1 should be (F1_x,F1_y)
 	// climb up direction of F2 should be (F2_x,F2_y)
+	double F1_x = 2*a1*x+c1*y+d1;
+	double F1_y = 2*b1*y+c1*x+e1;
+	double F2_x = 2*a2*x+c2*y+d2;
+	double F2_y = 2*b2*y+c2*x+e2;
 
 	double F1_L = sqrt(F1_x*F1_x + F1_y*F1_y);
 	double F2_L = sqrt(F2_x*F2_x + F2_y*F2_y);
@@ -45,10 +44,10 @@ void solveQuad(double a1, double b1, double c1,
 	// for F1, (x0,y0 go (x_nor,y_nor) * err_F1)
 	// for F2, (x0,y0 go (x_nor,y_nor) * err_F2)
 
-	x = x + (0-F1)/F1_del * F1_x_nor + (0-F2)/F2_del * F2_x_nor;
-	y = y + (0-F1)/F1_del * F1_y_nor + (0-F2)/F2_del * F2_y_nor;
+	x += (0-F1)/F1_del * F1_x_nor + (0-F2)/F2_del * F2_x_nor;
+	y += (0-F1)/F1_del * F1_y_nor + (0-F2)/F2_del * F2_y_nor;
 
-	if (count > 10) 
+	if (count > 100000) 
 		{ *pansx = x; *pansy = y; return; }
 
 	solveQuad(a1,b1,c1,d1,e1,f1,
