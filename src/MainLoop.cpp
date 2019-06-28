@@ -172,10 +172,10 @@ int function_draw()
 		tags[i].draw();
 	for (int i = 0; i < nTags; i++)
 	{
-		luatags[i].l += Vector3(0.2, 0, 0);
+		luatags[i].l += Vector3(0.3, 0, 0);
 		luatags[i].draw();
 
-		homotags[i].l -= Vector3(0.2,0,0);
+		homotags[i].l -= Vector3(0.3,0,0);
 		homotags[i].draw();
 	}
 	return 0;
