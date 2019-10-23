@@ -48,6 +48,9 @@ Box tags[NTAGS];
 Box homotags[NTAGS];
 Box luatags[NTAGS];
 
+Box tagDirections[NTAGS];
+Box luatagDirections[NTAGS];
+
 // functions
 int drawCross(Mat img, int x, int y, const char colour[],int label);
 int drawCross(Mat img, int x, int y, const char colour[]);
@@ -74,6 +77,11 @@ int function_init(int SystemWidth, int SystemHeight)
 		luatags[i].setSize(0.03, 0.03, 0.001);
 	for (int i = 0; i < NTAGS; i++)
 		homotags[i].setSize(0.03, 0.03, 0.001);
+
+	for (int i = 0; i < NTAGS; i++)
+		tagDirections[i].setSize(0.005, 0.005, 0.03);
+	for (int i = 0; i < NTAGS; i++)
+		luatagDirections[i].setSize(0.005, 0.005, 0.03);
 
 	// open camera
 	video1.open(0);
@@ -134,8 +142,8 @@ int function_step(double time)	// time in s
 		// for apriltag width first, height second 
 		// for opencv height first, width second 
 		drawCross(imgRGB, detection->c[1], detection->c[0], "blue");
-		drawCross(imgRGB, detection->p[0][1], detection->p[0][0], "blue");
-		drawCross(imgRGB, detection->p[1][1], detection->p[1][0], "blue");
+		drawCross(imgRGB, detection->p[0][1], detection->p[0][0], "red");
+		drawCross(imgRGB, detection->p[1][1], detection->p[1][0], "green");
 		drawCross(imgRGB, detection->p[2][1], detection->p[2][0], "blue");
 		drawCross(imgRGB, detection->p[3][1], detection->p[3][0], "blue");
 
@@ -145,9 +153,13 @@ int function_step(double time)	// time in s
 
 		double err = estimate_tag_pose(&CameraInfo, &pose);	
 		tags[i].setl(pose.t->data[0], pose.t->data[1], pose.t->data[2]);
+		printf("tags[i].l = %s\n", tags[i].l.toStr());
 		Quaternion q;
 		rotationMatToQuaternion(pose.R->data, q);
-		tags[i].setq(q);
+		tags[i].setq(q * Quaternion(1,0,0, 3.1415926));
+
+		tagDirections[i].setl(tags[i].l + tags[i].q.toRotate(Vector3(0,0,0.015)));
+		tagDirections[i].setq(tags[i].q);
 
 		estimate_pose_for_tag_homography(&CameraInfo, &pose);	
 		homotags[i].setl(pose.t->data[0], pose.t->data[1], pose.t->data[2]);
@@ -157,6 +169,11 @@ int function_step(double time)	// time in s
 
 	// lua blocktracking
 	lua_step(psDetections, luatags);
+	for (int i = 0; i < nTags; i++)
+	{
+		luatagDirections[i].setl(luatags[i].l + luatags[i].q.toRotate(Vector3(0,0,0.015)));
+		luatagDirections[i].setq(luatags[i].q);
+	}
 
 	// destroy and draw 
 	apriltag_detections_destroy(psDetections);
@@ -170,10 +187,17 @@ int function_draw()
 {
 	for (int i = 0; i < nTags; i++)
 		tags[i].draw();
+
+	for (int i = 0; i < nTags; i++)
+		tagDirections[i].draw();
+
 	for (int i = 0; i < nTags; i++)
 	{
 		luatags[i].l += Vector3(0.3, 0, 0);
 		luatags[i].draw();
+
+		luatagDirections[i].l += Vector3(0.3, 0, 0);
+		luatagDirections[i].draw();
 
 		homotags[i].l -= Vector3(0.3,0,0);
 		homotags[i].draw();
