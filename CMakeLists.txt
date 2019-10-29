@@ -99,6 +99,7 @@ include_directories(${OPENGL_INCLUDE_DIRS}
 			src/Robot
 			src/CWorld
 			src/CellularAutomaton
+			blocktracking/solveSqu
             ${OpenCV_INCLUDE_DIRS}
             ${AprilTag_INCLUDE_DIR}
 		)
@@ -125,6 +126,8 @@ add_executable(main src/GLTools/MainGL.cpp
 
 					src/CWorld/ChessWorld.cpp	
 					src/CellularAutomaton/CellularAutomaton.cpp
+
+					blocktracking/solveSqu/solveQuad.c
 			  )
 
 

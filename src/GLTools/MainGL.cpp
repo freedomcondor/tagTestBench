@@ -66,7 +66,8 @@ int WindowHeightMiddle, WindowwidthMiddle;	// the size of window
 int WindowX, WindowY;	// the size of window
 
 	/*----------------- Navigations -------------------------*/
-float EyeWInit = 270, 	EyeThInit = -90, 	EyeLInit = 0.001;
+//float EyeWInit = 270, 	EyeThInit = -90, 	EyeLInit = 0.001;
+float EyeWInit = 270, 	EyeThInit = 0, 	EyeLInit = 0.001;
 float EyeXInit = 0, 	EyeYInit = 0, 		EyeZInit = 0;
 float EyeW = EyeWInit,	EyeTh = EyeThInit,	EyeL = EyeLInit;				// all unit mm and degree
 float EyeX = EyeXInit,	EyeY = EyeYInit,	EyeZ = EyeZInit;					// all unit mm

@@ -23,6 +23,11 @@
 #include <lua5.2/lua.h>
 #include <lua5.2/lauxlib.h>
 #include <lua5.2/lualib.h>
+
+extern "C" {
+#include "solveQuad.h"
+}
+
 using namespace cv;
 
 /*------------ Function Control Channels ------------*/
@@ -47,6 +52,8 @@ int nTags = 0;
 Box tags[NTAGS];
 Box homotags[NTAGS];
 Box luatags[NTAGS];
+
+Sphere cSolvetags[NTAGS];
 
 Box tagDirections[NTAGS];
 Box luatagDirections[NTAGS];
@@ -77,6 +84,8 @@ int function_init(int SystemWidth, int SystemHeight)
 		luatags[i].setSize(0.03, 0.03, 0.001);
 	for (int i = 0; i < NTAGS; i++)
 		homotags[i].setSize(0.03, 0.03, 0.001);
+	for (int i = 0; i < NTAGS; i++)
+		cSolvetags[i].setSize(0.01);
 
 	for (int i = 0; i < NTAGS; i++)
 		tagDirections[i].setSize(0.005, 0.005, 0.03);
@@ -151,9 +160,9 @@ int function_step(double time)	// time in s
 		apriltag_pose_t pose;
 		CameraInfo.det = detection; // don't know what does it mean
 
+		// iteration
 		double err = estimate_tag_pose(&CameraInfo, &pose);	
 		tags[i].setl(pose.t->data[0], pose.t->data[1], pose.t->data[2]);
-		printf("tags[i].l = %s\n", tags[i].l.toStr());
 		Quaternion q;
 		rotationMatToQuaternion(pose.R->data, q);
 		tags[i].setq(q * Quaternion(1,0,0, 3.1415926));
@@ -161,10 +170,25 @@ int function_step(double time)	// time in s
 		tagDirections[i].setl(tags[i].l + tags[i].q.toRotate(Vector3(0,0,0.015)));
 		tagDirections[i].setq(tags[i].q);
 
+		// homography
 		estimate_pose_for_tag_homography(&CameraInfo, &pose);	
 		homotags[i].setl(pose.t->data[0], pose.t->data[1], pose.t->data[2]);
 		rotationMatToQuaternion(pose.R->data, q);
 		homotags[i].setq(q);
+
+		// solveSquare in C
+		double cameraPara[4] = {CameraInfo.fx, CameraInfo.fy, CameraInfo.cx, CameraInfo.cy};
+		double tagCorners[8] = {
+			detection->p[0][0], detection->p[0][1],
+			detection->p[1][0], detection->p[1][1],
+			detection->p[2][0], detection->p[2][1],
+			detection->p[3][0], detection->p[3][1],
+		};
+		double position[3];
+		double orientation[4];
+		solveTag(tagCorners, cameraPara, CameraInfo.tagsize, 
+                 position, orientation);
+		cSolvetags[i].setl(position[0],position[1],position[2]);
 	}
 
 	// lua blocktracking
@@ -201,6 +225,9 @@ int function_draw()
 
 		homotags[i].l -= Vector3(0.3,0,0);
 		homotags[i].draw();
+
+		cSolvetags[i].l += Vector3(0.5,0,0);
+		cSolvetags[i].draw();
 	}
 	return 0;
 }
