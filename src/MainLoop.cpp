@@ -53,10 +53,11 @@ Box tags[NTAGS];
 Box homotags[NTAGS];
 Box luatags[NTAGS];
 
-Sphere cSolvetags[NTAGS];
+Box cSolvetags[NTAGS];
 
 Box tagDirections[NTAGS];
 Box luatagDirections[NTAGS];
+Box cSolvetagDirections[NTAGS];
 
 // functions
 int drawCross(Mat img, int x, int y, const char colour[],int label);
@@ -85,12 +86,14 @@ int function_init(int SystemWidth, int SystemHeight)
 	for (int i = 0; i < NTAGS; i++)
 		homotags[i].setSize(0.03, 0.03, 0.001);
 	for (int i = 0; i < NTAGS; i++)
-		cSolvetags[i].setSize(0.01);
+		cSolvetags[i].setSize(0.03, 0.03, 0.001);
 
 	for (int i = 0; i < NTAGS; i++)
 		tagDirections[i].setSize(0.005, 0.005, 0.03);
 	for (int i = 0; i < NTAGS; i++)
 		luatagDirections[i].setSize(0.005, 0.005, 0.03);
+	for (int i = 0; i < NTAGS; i++)
+		cSolvetagDirections[i].setSize(0.005, 0.005, 0.03);
 
 	// open camera
 	video1.open(0);
@@ -189,6 +192,12 @@ int function_step(double time)	// time in s
 		solveTag(tagCorners, cameraPara, CameraInfo.tagsize, 
                  position, orientation);
 		cSolvetags[i].setl(position[0],position[1],position[2]);
+		Quaternion q2;
+		rotationMatToQuaternion(orientation, q2);
+		cSolvetags[i].setq(q2);
+
+		cSolvetagDirections[i].setl(cSolvetags[i].l + cSolvetags[i].q.toRotate(Vector3(0,0,0.015)));
+		cSolvetagDirections[i].setq(cSolvetags[i].q);
 	}
 
 	// lua blocktracking
@@ -228,6 +237,9 @@ int function_draw()
 
 		cSolvetags[i].l += Vector3(0.5,0,0);
 		cSolvetags[i].draw();
+
+		cSolvetagDirections[i].l += Vector3(0.5,0,0);
+		cSolvetagDirections[i].draw();
 	}
 	return 0;
 }
@@ -348,12 +360,49 @@ int setColor(cv::Vec<unsigned char, 3> &pix,int R,int G, int B)
 
 int rotationMatToQuaternion(double data[], Quaternion& q)
 {
+	/*
 	double w, x, y, z;
 	w = sqrt(1.0 + data[3*0+0] + data[3*1+1] + data[3*2+2]) / 2.0;
 	double w4 = w * 4.0;
 	x = (data[3*2+1] - data[3*1+2]) / w4;
 	y = (data[3*0+2] - data[3*2+0]) / w4;
 	z = (data[3*1+0] - data[3*0+1]) / w4;
+	printf("xyzw = %lf %lf %lf %lf\n", x + y + z + w);
+	q.setHardValue(x,y,z,w);
+	printf("length = %lf\n", x*x + y*y + z*z + w*w);
+	return 0;
+	*/
+	double x, y, z, w;
+	double trace = data[3*0+0] + data[3*1+1] + data[3*2+2]; // I removed + 1.0f; see discussion with Ethan
+	if( trace > 0 ) {// I changed M_EPSILON to 0
+    	double s = 0.5f / sqrtf(trace+ 1.0f);
+		w = 0.25f / s;
+		x = ( data[3*2+1] - data[3*1+2] ) * s;
+		y = ( data[3*0+2] - data[3*2+0] ) * s;
+		z = ( data[3*1+0] - data[3*0+1] ) * s;
+	} 
+	else 
+	{
+		if ( data[3*0+0] > data[3*1+1] && data[3*0+0] > data[3*2+2] ) {
+			double s = 2.0f * sqrtf( 1.0f + data[3*0+0] - data[3*1+1] - data[3*2+2]);
+			w = (data[3*2+1] - data[3*1+2] ) / s;
+			x = 0.25f * s;
+			y = (data[3*0+1] + data[3*1+0] ) / s;
+			z = (data[3*0+2] + data[3*2+0] ) / s;
+		} else if (data[3*1+1] > data[3*2+2]) {
+			float s = 2.0f * sqrtf( 1.0f + data[3*1+1] - data[3*0+0] - data[3*2+2]);
+			w = (data[3*0+2] - data[3*2+0] ) / s;
+			x = (data[3*0+1] + data[3*1+0] ) / s;
+			y = 0.25f * s;
+			z = (data[3*1+2] + data[3*2+1] ) / s;
+		} else {
+			float s = 2.0f * sqrtf( 1.0f + data[3*2+2] - data[3*0+0] - data[3*1+1] );
+			w = (data[3*1+0] - data[3*0+1] ) / s;
+			x = (data[3*0+2] + data[3*2+0] ) / s;
+			y = (data[3*1+2] + data[3*2+1] ) / s;
+			z = 0.25f * s;
+		}
+	}
 	q.setHardValue(x,y,z,w);
 	return 0;
 }

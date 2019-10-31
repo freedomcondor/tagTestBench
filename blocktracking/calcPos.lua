@@ -30,7 +30,8 @@ function calTagPos(tag)
 	tag.corners.halfL = tag.halfL;
 	if tag.camera_flag == 1 then		-- for PC test Camera
 		cam_para = {939.001439,939.001439,320,240}
-		dis_para = {-0.4117914,5.17498964,0,0,-17.7026842}	
+		--dis_para = {-0.4117914,5.17498964,0,0,-17.7026842}	
+		dis_para = {0,0,0,0,0}	
 	else								-- for robot Camera
 		cam_para = {305.4607,306.4607,160.0,120.0}	-- for 320*240
 		--cam_para = {610.92145,610.92145,320.0,240.0}	-- for 640*480
