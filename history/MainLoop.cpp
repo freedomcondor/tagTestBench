@@ -14,7 +14,7 @@
 #include <apriltag/apriltag_pose.h>
 
 extern "C" {
-#include "solve_square.h"
+#include "solveQuad.h"
 }
 
 #include <stdio.h>
@@ -154,16 +154,24 @@ int simu_step(double time)	// time in s
 		matd_destroy(pose.R);
 
 		// solveSquare in C
-		err = estimate_tag_pose_solve_square(&CameraInfo, &pose);	
+		double cameraPara[4] = {CameraInfo.fx, CameraInfo.fy, CameraInfo.cx, CameraInfo.cy};
+		double tagCorners[8] = {
+			detection->p[0][0], detection->p[0][1],
+			detection->p[1][0], detection->p[1][1],
+			detection->p[2][0], detection->p[2][1],
+			detection->p[3][0], detection->p[3][1],
+		};
+		double position[3];
+		double orientation[9];
+		solveTag(tagCorners, cameraPara, CameraInfo.tagsize, 
+                 position, orientation);
 
-		c_tags[i].setl(pose.t->data[0], pose.t->data[1], pose.t->data[2]);
-		rotationMatToQuaternion(pose.R->data, q);
-		c_tags[i].setq(q * Quaternion(1,0,0, 3.1415926));
+		c_tags[i].setl(position[0],position[1],position[2]);
+		Quaternion q2;
+		rotationMatToQuaternion(orientation, q2);
+		c_tags[i].setq(q2);
 		c_tagDir[i].setl(c_tags[i].l + c_tags[i].q.toRotate(Vector3(0,0,0.015)));
 		c_tagDir[i].setq(c_tags[i].q);
-
-		matd_destroy(pose.t);
-		matd_destroy(pose.R);
 	}
 
 	// ----------------- opencv show ----------------------------- //

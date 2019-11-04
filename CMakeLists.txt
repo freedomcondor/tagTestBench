@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
 set(simu_Lua on)
-set(simu_Math on)
-set(simu_Tools on)
 add_subdirectory(../simuGL/src
                  ${CMAKE_CURRENT_BINARY_DIR}/simuGL
 )
@@ -35,6 +33,8 @@ ENDIF (NOT AprilTag_FOUND)
 #   AprilTag_INCLUDE_DIR, where to find TagDetector.h, etc.
 #   AprilTag_LIB, libraries to link against to use AprilTag.
 
+set(CMAKE_BUILD_TYPE Debug)
+
 add_definitions(
 	${simu_definitions}
 )
@@ -42,7 +42,7 @@ add_definitions(
 add_executable(main 
 	${simu_cpps}
 	MainLoop.cpp
-	solveQuad.c
+	solve_square.c
 )
 
 include_directories( 

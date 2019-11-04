@@ -8,14 +8,6 @@
 
 */
 /*---------------------------------------------------------*/
-#include <opencv2/opencv.hpp>
-#include <apriltag/apriltag.h>
-#include <apriltag/tag36h11.h>
-#include <apriltag/apriltag_pose.h>
-
-extern "C" {
-#include "solve_square.h"
-}
 
 #include <stdio.h>
 #include "GLTools.h"
@@ -24,12 +16,27 @@ extern "C" {
 #include "Quaternion.h"
 
 #include "Box.h"
+#include "Sphere.h"
+#include "Cylinder.h"
+#include "Convexhull.h"
 
-#include "LuaCtrl.h"
+#include <lua5.2/lua.h>
+#include <lua5.2/lauxlib.h>
+#include <lua5.2/lualib.h>
+
+extern "C" {
+#include "solveQuad.h"
+}
 
 using namespace cv;
 
-// opencv
+/*------------ Function Control Channels ------------*/
+double CH1,CH1_MAX,CH1_MIN,CH1_STEP;
+double CH2,CH2_MAX,CH2_MIN,CH2_STEP;
+int CMDCH1;
+
+/*------------ Custom ------------*/
+// OpenCV
 VideoCapture video1;
 
 // apriltag
@@ -37,49 +44,65 @@ apriltag_detector* TagDetector;
 apriltag_family* TagFamily;
 apriltag_detection_info_t CameraInfo;
 
+// lua
+lua_State *L;
+
+#define NTAGS 10
+int nTags = 0;
+Box tags[NTAGS];
+Box homotags[NTAGS];
+Box luatags[NTAGS];
+
+Box cSolvetags[NTAGS];
+
+Box tagDirections[NTAGS];
+Box luatagDirections[NTAGS];
+Box cSolvetagDirections[NTAGS];
+
 // functions
 int drawCross(Mat img, int x, int y, const char colour[],int label);
 int drawCross(Mat img, int x, int y, const char colour[]);
 int setColor(cv::Vec<unsigned char, 3> &pix,int R,int G, int B);
 int rotationMatToQuaternion(double data[], Quaternion& q);
 
-// tags
-#define NTAGS 20
-int nTags = 0;
-Box lib_tags[NTAGS];
-Box lib_tagDir[NTAGS];
-Box c_tags[NTAGS];
-Box c_tagDir[NTAGS];
-
+int lua_init();
+int lua_step(zarray_t* psDetections, Box luatags[]);
 /* --------------- MainLoop functions --------------------*/
-int simu_exit()
+int function_exit()
 {
+	apriltag_detector_remove_family(TagDetector, TagFamily);
+	apriltag_detector_destroy(TagDetector);
+	tag36h11_destroy(TagFamily);
 	return 0;
 }
 
-int simu_init(int ScreenWidth, int ScreenHeight)
+int function_init(int SystemWidth, int SystemHeight)
 {
-	EyeWInit = 270; EyeThInit = -90; EyeLInit = 0.015;
-	EyeXInit = 0;   EyeYInit = 0;  EyeZInit = 0;
-
 	// initalize tags
-	Vector3 tagSize = Vector3(0.03, 0.03, 0.001);
-	Vector3 tagDirSize = Vector3(0.005, 0.005, 0.03);
 	for (int i = 0; i < NTAGS; i++)
-	{
-		lib_tags[i].setSize(tagSize);
-		lib_tagDir[i].setSize(tagDirSize);
-		c_tags[i].setSize(tagSize);
-		c_tagDir[i].setSize(tagDirSize);
-	}
+		tags[i].setSize(0.03, 0.03, 0.001);
+	for (int i = 0; i < NTAGS; i++)
+		luatags[i].setSize(0.03, 0.03, 0.001);
+	for (int i = 0; i < NTAGS; i++)
+		homotags[i].setSize(0.03, 0.03, 0.001);
+	for (int i = 0; i < NTAGS; i++)
+		cSolvetags[i].setSize(0.03, 0.03, 0.001);
 
-	// ------------------------ opencv --------------------------- //
+	for (int i = 0; i < NTAGS; i++)
+		tagDirections[i].setSize(0.005, 0.005, 0.03);
+	for (int i = 0; i < NTAGS; i++)
+		luatagDirections[i].setSize(0.005, 0.005, 0.03);
+	for (int i = 0; i < NTAGS; i++)
+		cSolvetagDirections[i].setSize(0.005, 0.005, 0.03);
+
+	// open camera
 	video1.open(0);
 	if (video1.isOpened()) printf("camera open successful\n");
 	                 else {printf("camera open failed\n"); return -1;}
+
 	namedWindow("camera", WINDOW_NORMAL);
-	moveWindow("camera",ScreenWidth/2,0);
-	resizeWindow("camera",ScreenWidth/2,ScreenHeight/2);
+	moveWindow("camera",SystemWidth/2,0);
+	resizeWindow("camera",SystemWidth/2,SystemHeight/2);
 
 	// open apriltag
 	TagDetector = apriltag_detector_create();
@@ -98,19 +121,19 @@ int simu_init(int ScreenWidth, int ScreenHeight)
 	CameraInfo.cx = 320 ;
 	CameraInfo.cy = 240;
 
+	// lua
+	lua_init();
+
 	return 0;
 }
 
-int simu_step(double time)	// time in s
+int function_step(double time)	// time in s
 {
-	printf("--------step----------\n");
-	// ----------------- opencv capture  ------------------------- //
 	Mat imgRGB, imgGRAY;
 	// capture image
-	//video1 >> imgRGB;
-	imgRGB = imread("../failure.jpg");
+	video1 >> imgRGB;
 	cvtColor(imgRGB, imgGRAY, CV_BGR2GRAY);
-	// ----------------- apriltag detect ------------------------- //
+	// detect apriltag
 	image_u8_t* imgU8Y = image_u8_create(imgGRAY.cols, imgGRAY.rows);
 	for (unsigned int row = 0; row < imgU8Y->height; row++)
 		memcpy(&imgU8Y->buf[row * imgU8Y->stride],
@@ -127,7 +150,7 @@ int simu_step(double time)	// time in s
 		apriltag_detection_t *detection;
 		zarray_get(psDetections, i, &detection);
 
-		// draw 4 corners on opencv screen
+		// draw on opencv screen
 		// for apriltag width first, height second 
 		// for opencv height first, width second 
 		drawCross(imgRGB, detection->c[1], detection->c[0], "blue");
@@ -138,60 +161,90 @@ int simu_step(double time)	// time in s
 
 		// pose detection
 		apriltag_pose_t pose;
-		CameraInfo.det = detection;
+		CameraInfo.det = detection; // don't know what does it mean
 
 		// iteration
 		double err = estimate_tag_pose(&CameraInfo, &pose);	
-
-		lib_tags[i].setl(pose.t->data[0], pose.t->data[1], pose.t->data[2]);
+		tags[i].setl(pose.t->data[0], pose.t->data[1], pose.t->data[2]);
 		Quaternion q;
 		rotationMatToQuaternion(pose.R->data, q);
-		lib_tags[i].setq(q * Quaternion(1,0,0, 3.1415926));
-		lib_tagDir[i].setl(lib_tags[i].l + lib_tags[i].q.toRotate(Vector3(0,0,0.015)));
-		lib_tagDir[i].setq(lib_tags[i].q);
+		tags[i].setq(q * Quaternion(1,0,0, 3.1415926));
 
-		matd_destroy(pose.t);
-		matd_destroy(pose.R);
+		tagDirections[i].setl(tags[i].l + tags[i].q.toRotate(Vector3(0,0,0.015)));
+		tagDirections[i].setq(tags[i].q);
+
+		// homography
+		estimate_pose_for_tag_homography(&CameraInfo, &pose);	
+		homotags[i].setl(pose.t->data[0], pose.t->data[1], pose.t->data[2]);
+		rotationMatToQuaternion(pose.R->data, q);
+		homotags[i].setq(q);
 
 		// solveSquare in C
-		err = estimate_tag_pose_solve_square(&CameraInfo, &pose);	
+		double cameraPara[4] = {CameraInfo.fx, CameraInfo.fy, CameraInfo.cx, CameraInfo.cy};
+		double tagCorners[8] = {
+			detection->p[0][0], detection->p[0][1],
+			detection->p[1][0], detection->p[1][1],
+			detection->p[2][0], detection->p[2][1],
+			detection->p[3][0], detection->p[3][1],
+		};
+		double position[3];
+		double orientation[4];
+		solveTag(tagCorners, cameraPara, CameraInfo.tagsize, 
+                 position, orientation);
+		cSolvetags[i].setl(position[0],position[1],position[2]);
+		Quaternion q2;
+		rotationMatToQuaternion(orientation, q2);
+		cSolvetags[i].setq(q2);
 
-		c_tags[i].setl(pose.t->data[0], pose.t->data[1], pose.t->data[2]);
-		rotationMatToQuaternion(pose.R->data, q);
-		c_tags[i].setq(q * Quaternion(1,0,0, 3.1415926));
-		c_tagDir[i].setl(c_tags[i].l + c_tags[i].q.toRotate(Vector3(0,0,0.015)));
-		c_tagDir[i].setq(c_tags[i].q);
-
-		matd_destroy(pose.t);
-		matd_destroy(pose.R);
+		cSolvetagDirections[i].setl(cSolvetags[i].l + cSolvetags[i].q.toRotate(Vector3(0,0,0.015)));
+		cSolvetagDirections[i].setq(cSolvetags[i].q);
 	}
 
-	// ----------------- opencv show ----------------------------- //
+	// lua blocktracking
+	lua_step(psDetections, luatags);
+	for (int i = 0; i < nTags; i++)
+	{
+		luatagDirections[i].setl(luatags[i].l + luatags[i].q.toRotate(Vector3(0,0,0.015)));
+		luatagDirections[i].setq(luatags[i].q);
+	}
+
+	// destroy and draw 
+	apriltag_detections_destroy(psDetections);
 	imshow("camera", imgRGB);
 	waitKey(1);
 	return 0;
 }
 
 /* --------------- OpenGL draw functions --------------------*/
-int simu_draw()
+int function_draw()
 {
 	for (int i = 0; i < nTags; i++)
+		tags[i].draw();
+
+	for (int i = 0; i < nTags; i++)
+		tagDirections[i].draw();
+
+	for (int i = 0; i < nTags; i++)
 	{
-		lib_tags[i].l -= Vector3(0.15,0,0);
-		lib_tagDir[i].l -= Vector3(0.15,0,0);
-		lib_tags[i].draw();
-		lib_tagDir[i].draw();
+		luatags[i].l += Vector3(0.3, 0, 0);
+		luatags[i].draw();
 
-		c_tags[i].l += Vector3(0.15,0,0);
-		c_tagDir[i].l += Vector3(0.15,0,0);
-		c_tags[i].draw();
-		c_tagDir[i].draw();
+		luatagDirections[i].l += Vector3(0.3, 0, 0);
+		luatagDirections[i].draw();
+
+		homotags[i].l -= Vector3(0.3,0,0);
+		homotags[i].draw();
+
+		cSolvetags[i].l += Vector3(0.5,0,0);
+		cSolvetags[i].draw();
+
+		cSolvetagDirections[i].l += Vector3(0.5,0,0);
+		cSolvetagDirections[i].draw();
 	}
-
 	return 0;
 }
 
-int simu_draw2()
+int function_draw2()
 {
 	return 0;
 }
@@ -351,6 +404,164 @@ int rotationMatToQuaternion(double data[], Quaternion& q)
 		}
 	}
 	q.setHardValue(x,y,z,w);
+	return 0;
+}
+
+/* ------ lua -------------------*/
+int lua_addTableItem(lua_State *L, char str[], double x)
+{
+	lua_pushstring(L, str);	
+	lua_pushnumber(L, x);
+	lua_settable(L,-3);
+	return 0;
+}
+
+int lua_pushXY(lua_State *L, double x, double y)
+{
+	lua_newtable(L);
+	lua_addTableItem(L, "x", x);
+	lua_addTableItem(L, "y", y);
+	return 0;
+}
+
+int lua_pushcorners(lua_State *L, apriltag_detection_t *detection)
+{
+	lua_newtable(L);
+	for (int i = 0; i < 4; i++)
+	{
+		int index = lua_gettop(L);
+		lua_pushnumber(L, i+1);
+		lua_pushXY(L, detection->p[i][0],detection->p[i][1]);
+		lua_settable(L,index);
+	}
+	return 0;
+}
+
+int lua_pushtag(lua_State *L, apriltag_detection_t *detection)
+{
+	lua_newtable(L);
+	lua_addTableItem(L, "id", detection->id);
+
+	int index = lua_gettop(L);
+	lua_pushstring(L, "center");
+	lua_pushXY(L, detection->c[0],detection->c[1]);
+	lua_settable(L,index);
+
+	lua_pushstring(L, "corners");
+	lua_pushcorners(L, detection);
+	lua_settable(L,index);
+
+	return 0;
+}
+
+int lua_pushBlocktrackingPara(lua_State *L, zarray_t* psDetections)
+{
+	lua_newtable(L);
+	lua_addTableItem(L, "camera_flag", 1);
+	lua_addTableItem(L, "n", zarray_size(psDetections));
+
+	for (int i = 0; i < zarray_size(psDetections); i++)
+	{
+		apriltag_detection_t *detection;
+		zarray_get(psDetections, i, &detection);
+
+		int index = lua_gettop(L);
+		lua_pushnumber(L, i+1);
+		lua_pushtag(L, detection);
+		lua_settable(L,index);
+	}
+
+	return 0;
+}
+
+double lua_asktablenumber(lua_State *L, char str[])
+{
+	lua_pushstring(L, str);
+	lua_gettable(L,-2);	
+	double n = luaL_checknumber(L,-1);
+	lua_pop(L,1);
+	return n;
+}
+
+int lua_getVector(lua_State *L, char str[], Vector3& v)
+{
+	lua_pushstring(L, str);
+	lua_gettable(L,-2);
+	double x = lua_asktablenumber(L, "x");
+	double y = lua_asktablenumber(L, "y");
+	double z = lua_asktablenumber(L, "z");
+	v.set(x,y,z);
+	lua_pop(L,1);
+}
+
+int lua_getQuaternion(lua_State *L, char str[], Quaternion& q)
+{
+	lua_pushstring(L, str);
+	lua_gettable(L,-2);
+	Vector3 v;
+	lua_getVector(L, "v", v);
+	double w = lua_asktablenumber(L, "w");
+	q.setHardValue(v.x,v.y,v.z,w);
+	lua_pop(L,1);
+}
+
+int lua_gettag(lua_State *L, Box& tagbox)
+{
+	Vector3 v;
+	Quaternion q;
+	lua_getQuaternion(L, "quaternion", q);
+	lua_getVector(L, "translation", v);
+	tagbox.setl(v);
+	tagbox.setq(q);
+	return 0;
+}
+
+int lua_asktags(lua_State *L, Box luatags[])
+{
+	lua_pushstring(L,"tags");
+	lua_gettable(L,-2);	
+
+	int n = (int)lua_asktablenumber(L, "n");
+	for (int i = 0; i < n; i++)
+	{
+		lua_pushnumber(L,i+1);	
+		lua_gettable(L,-2);	
+		lua_gettag(L, luatags[i]);
+		lua_pop(L, 1);
+	}
+
+	lua_pop(L, 1);
+	return 0;
+}
+
+int lua_getBlocktrackingResult(lua_State *L, Box luatags[])
+{
+	lua_asktags(L, luatags);
+	// ask boxes
+	return 0;
+}
+
+int lua_init()
+{
+	L = luaL_newstate();
+	luaL_openlibs(L);
+
+	if ((luaL_loadfile(L, "../blocktracking/func.lua")) || (lua_pcall(L,0,0,0)))
+		{printf("open lua file fail : %s\n",lua_tostring(L,-1));return -1;}
+
+	return 0;
+}
+
+int lua_step(zarray_t* psDetections, Box luatags[])
+{
+	lua_getglobal(L,"blocktracking"); // stack 1 is the function
+
+	lua_pushBlocktrackingPara(L, psDetections);
+
+	if (lua_pcall(L,1,1,0) != 0)	// one para, one return
+		{printf("call func fail %s\n",lua_tostring(L,-1)); return -1;}
+
+	lua_getBlocktrackingResult(L, luatags);
 	return 0;
 }
 
