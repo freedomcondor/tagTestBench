@@ -164,6 +164,11 @@ int simu_step(double time)	// time in s
 
 		matd_destroy(pose.t);
 		matd_destroy(pose.R);
+
+		lib_tags[i].l -= Vector3(0.15,0,0);
+		lib_tagDir[i].l -= Vector3(0.15,0,0);
+		c_tags[i].l += Vector3(0.15,0,0);
+		c_tagDir[i].l += Vector3(0.15,0,0);
 	}
 
 	// ----------------- opencv show ----------------------------- //
@@ -177,13 +182,9 @@ int simu_draw()
 {
 	for (int i = 0; i < nTags; i++)
 	{
-		lib_tags[i].l -= Vector3(0.15,0,0);
-		lib_tagDir[i].l -= Vector3(0.15,0,0);
 		lib_tags[i].draw();
 		lib_tagDir[i].draw();
 
-		c_tags[i].l += Vector3(0.15,0,0);
-		c_tagDir[i].l += Vector3(0.15,0,0);
 		c_tags[i].draw();
 		c_tagDir[i].draw();
 	}
