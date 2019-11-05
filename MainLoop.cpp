@@ -25,7 +25,7 @@ extern "C" {
 
 #include "Box.h"
 
-#include "LuaCtrl.h"
+//#include "LuaCtrl.h"
 
 using namespace cv;
 

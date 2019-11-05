@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-set(simu_Lua on)
+#set(simu_Lua on)
 add_subdirectory(../simuGL/src
                  ${CMAKE_CURRENT_BINARY_DIR}/simuGL
 )
