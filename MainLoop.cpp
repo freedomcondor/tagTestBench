@@ -31,6 +31,7 @@ using namespace cv;
 
 // opencv
 VideoCapture video1;
+VideoCapture video2;
 
 // apriltag
 apriltag_detector* TagDetector;
@@ -77,9 +78,28 @@ int simu_init(int ScreenWidth, int ScreenHeight)
 	video1.open(0);
 	if (video1.isOpened()) printf("camera open successful\n");
 	                 else {printf("camera open failed\n"); return -1;}
-	namedWindow("camera", WINDOW_NORMAL);
-	moveWindow("camera",ScreenWidth/2,0);
-	resizeWindow("camera",ScreenWidth/2,ScreenHeight/2);
+
+	video1.set(CV_CAP_PROP_FRAME_WIDTH,800);
+	video1.set(CV_CAP_PROP_FRAME_HEIGHT,600);
+	//video1.set(CV_CAP_PROP_FRAME_WIDTH,1024);
+	//video1.set(CV_CAP_PROP_FRAME_HEIGHT,768);
+
+	namedWindow("camera1", WINDOW_NORMAL);
+	moveWindow("camera1",ScreenWidth/2,ScreenHeight/2);
+	resizeWindow("camera1",ScreenWidth/4,ScreenHeight/2.2);
+
+	video2.open(1);
+	if (video2.isOpened()) printf("camera open successful\n");
+	                 else {printf("camera open failed\n"); return -1;}
+
+	namedWindow("camera2", WINDOW_NORMAL);
+	moveWindow("camera2",ScreenWidth/2,0);
+	resizeWindow("camera2",ScreenWidth/4,ScreenHeight/2.2);
+
+	video2.set(CV_CAP_PROP_FRAME_WIDTH,800);
+	video2.set(CV_CAP_PROP_FRAME_HEIGHT,600);
+	//video2.set(CV_CAP_PROP_FRAME_WIDTH,1024);
+	//video2.set(CV_CAP_PROP_FRAME_HEIGHT,768);
 
 	// open apriltag
 	TagDetector = apriltag_detector_create();
@@ -93,10 +113,24 @@ int simu_init(int ScreenWidth, int ScreenHeight)
 
 	// apriltag pose estimation
 	CameraInfo.tagsize = 0.0235;
+	/*
 	CameraInfo.fx = 939.001439;
 	CameraInfo.fy = 939.001439;
 	CameraInfo.cx = 320 ;
 	CameraInfo.cy = 240;
+	*/
+
+	CameraInfo.fx = 796.9096;
+	CameraInfo.fy = 796.9096;
+	CameraInfo.cx = 400;
+	CameraInfo.cy = 300;
+
+	/*
+	CameraInfo.fx = 1039.4975;
+	CameraInfo.fy = 1039.4975;
+	CameraInfo.cx = 512;
+	CameraInfo.cy = 384;
+	*/
 
 	return 0;
 }
@@ -105,11 +139,20 @@ int simu_step(double time)	// time in s
 {
 	printf("--------step----------\n");
 	// ----------------- opencv capture  ------------------------- //
-	Mat imgRGB, imgGRAY;
+	Mat imgRGB800, imgRGB, imgGRAY;
 	// capture image
-	//video1 >> imgRGB;
-	imgRGB = imread("../failure.jpg");
+	video1 >> imgRGB800;
+	//imgRGB = imread("../failure.jpg");
+	
+	Rect crop(100, 0, 600, 600);
+	imgRGB = imgRGB800(crop);
+
 	cvtColor(imgRGB, imgGRAY, CV_BGR2GRAY);
+
+	Mat imgRGB8002, imgRGB2, imgGRAY2;
+	video2 >> imgRGB8002;
+	imgRGB2 = imgRGB8002(crop);
+
 	// ----------------- apriltag detect ------------------------- //
 	image_u8_t* imgU8Y = image_u8_create(imgGRAY.cols, imgGRAY.rows);
 	for (unsigned int row = 0; row < imgU8Y->height; row++)
@@ -121,6 +164,7 @@ int simu_step(double time)	// time in s
 
 	// get detections
 	nTags = zarray_size(psDetections);
+	printf("detect number: %d\n", nTags);
 	for (int i = 0; i < nTags; i++)
 	{
 		// get detection
@@ -172,7 +216,8 @@ int simu_step(double time)	// time in s
 	}
 
 	// ----------------- opencv show ----------------------------- //
-	imshow("camera", imgRGB);
+	imshow("camera1", imgRGB);
+	imshow("camera2", imgRGB2);
 	waitKey(1);
 	return 0;
 }
